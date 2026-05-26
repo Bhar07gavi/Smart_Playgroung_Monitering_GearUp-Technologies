@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Smart Playground Monitor</title>
+  <style>
+    :root {
+      --bg:#0c0e18; --panel:#131625; --card:#1a1f35; --card2:#202540;
+      --border:#272d4e; --accent:#4d7fff; --green:#22d472; --red:#e84040;
+      --yellow:#f0c030; --orange:#e07820; --text:#dde3f4; --muted:#7480a0;
+      --radius:10px;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-family:"Segoe UI",system-ui,sans-serif;
+      background:var(--bg);color:var(--text);
+      min-height:100vh;display:flex;flex-direction:column;font-size:14px;
+    }
+
+    /* HEADER */
+    header{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:10px 18px;background:var(--panel);
+      border-bottom:1px solid var(--border);flex-shrink:0;
+      position:sticky;top:0;z-index:100;
+    }
+    .h-left{display:flex;align-items:center;gap:10px;}
+    .logo{font-size:26px;}
+    h1{font-size:1.1rem;font-weight:700;}
+    .h-sub{font-size:.65rem;color:var(--muted);}
+    .h-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .badge{
+      display:flex;align-items:center;gap:6px;padding:4px 11px;
+      background:var(--card);border:1px solid var(--border);
+      border-radius:20px;font-size:.7rem;color:var(--muted);
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+    .dot.green{background:var(--green);box-shadow:0 0 6px var(--green);}
+    .dot.red{background:var(--red);}
+    .dot.pulse{background:var(--green);animation:blink 1.4s infinite;}
+    @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+    .stream-btn{
+      display:flex;align-items:center;gap:6px;padding:7px 18px;
+      border-radius:20px;border:none;cursor:pointer;
+      font-size:.78rem;font-weight:700;outline:none;
+      transition:background .2s,transform .1s;white-space:nowrap;
+    }
+    .stream-btn:active{transform:scale(.95);}
+    .stream-btn.running{background:var(--red);color:#fff;}
+    .stream-btn.stopped{background:var(--green);color:#000;}
+
+    /* ALERT BAR */
+    .alert-bar{
+      padding:12px;text-align:center;font-weight:700;
+      font-size:1rem;display:none;animation:alertPulse 1s infinite;
+    }
+    .alert-bar.fall{background:var(--red);display:block;}
+    .alert-bar.unauth{background:var(--orange);display:block;}
+    @keyframes alertPulse{0%,100%{opacity:1;}50%{opacity:.75;}}
+
+    /* LAYOUT */
+    .layout{display:flex;gap:14px;padding:14px;flex:1;}
+    .col-l{
+      width:660px;flex-shrink:0;display:flex;
+      flex-direction:column;gap:12px;
+    }
+    .col-r{
+      flex:1;display:flex;flex-direction:column;
+      gap:12px;min-width:0;
+    }
+    .sec-lbl{
+      display:flex;justify-content:space-between;align-items:center;
+      color:var(--muted);font-size:.75rem;margin-bottom:2px;
+    }
+
+    /* STREAM */
+    .stream-wrapper{
+      position:relative;width:640px;height:480px;
+      border-radius:var(--radius);overflow:hidden;
+      border:1px solid var(--border);background:#000;
+    }
+    .stream-wrapper img{
+      width:100%;height:100%;object-fit:contain;background:#000;display:block;
+    }
+    .paused-overlay{
+      display:none;position:absolute;inset:0;
+      background:rgba(12,14,24,.94);
+      flex-direction:column;align-items:center;
+      justify-content:center;gap:14px;z-index:10;
+    }
+    .paused-overlay.show{display:flex;}
+    .paused-icon{font-size:3.5rem;}
+    .paused-text{font-size:1.15rem;font-weight:700;color:var(--muted);}
+    .paused-sub{font-size:.72rem;color:var(--muted);opacity:.55;}
+    .resume-btn{
+      margin-top:8px;padding:9px 28px;border-radius:20px;border:none;
+      background:var(--green);color:#000;font-weight:700;
+      font-size:.85rem;cursor:pointer;
+    }
+
+    /* RECORDING OVERLAY on stream */
+    .rec-overlay{
+      display:none;position:absolute;top:10px;right:12px;
+      background:rgba(232,64,64,.9);color:#fff;
+      padding:4px 10px;border-radius:6px;
+      font-size:.72rem;font-weight:700;z-index:5;
+      animation:blink .7s infinite;
+    }
+    .rec-overlay.show{display:flex;align-items:center;gap:5px;}
+
+    /* CARDS */
+    .card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--radius);padding:13px;
+    }
+    .card-title{
+      font-size:.7rem;font-weight:700;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;
+    }
+
+    /* MODE CARD */
+    .mode-card{display:flex;align-items:center;gap:12px;}
+    .mode-icon{font-size:2.2rem;flex-shrink:0;}
+    .mode-label{font-size:.6rem;color:var(--muted);text-transform:uppercase;}
+    .mode-value{font-size:1.35rem;font-weight:800;line-height:1.1;}
+    .mode-sport{font-size:.75rem;color:var(--accent);margin-top:2px;}
+    .mode-pill{
+      margin-left:auto;padding:5px 16px;border-radius:20px;
+      font-size:.7rem;font-weight:700;background:var(--orange);white-space:nowrap;
+    }
+    .mode-pill.sport{background:var(--green);color:#000;}
+    .mode-pill.paused,.mode-pill.stopped{background:var(--muted);color:#000;}
+
+    /* RECORDING PROGRESS CARD */
+    .rec-card{
+      background:rgba(232,64,64,.1);border:2px solid var(--red)!important;
+      display:none;
+    }
+    .rec-card.show{display:block;}
+    .rec-header{
+      display:flex;align-items:center;gap:8px;margin-bottom:10px;
+    }
+    .rec-dot-big{
+      width:14px;height:14px;border-radius:50%;
+      background:var(--red);animation:blink .55s infinite;flex-shrink:0;
+    }
+    .rec-title{font-size:.9rem;font-weight:700;color:var(--red);}
+    .rec-pct{margin-left:auto;font-size:.85rem;font-weight:700;color:var(--red);}
+    .rec-bar-bg{
+      height:8px;background:var(--card2);border-radius:4px;overflow:hidden;
+    }
+    .rec-bar-fill{
+      height:100%;
+      background:linear-gradient(90deg,var(--red),var(--orange));
+      width:0%;transition:width .3s;border-radius:4px;
+    }
+    .rec-info{
+      margin-top:6px;font-size:.65rem;color:var(--muted);
+      display:flex;justify-content:space-between;
+    }
+
+    /* STATS */
+    .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+    .stat{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--radius);padding:10px 4px;text-align:center;
+    }
+    .stat-icon{font-size:1rem;}
+    .stat-value{font-size:1.1rem;font-weight:800;color:var(--accent);margin:3px 0 2px;}
+    .stat-label{font-size:.52rem;color:var(--muted);text-transform:uppercase;}
+
+    /* ALERT ROWS */
+    .alert-row{
+      display:flex;align-items:center;gap:10px;padding:10px 8px;
+      background:var(--card2);border-radius:7px;
+      border:1px solid transparent;margin-top:8px;
+      transition:background .3s,border-color .3s;
+    }
+    .alert-row.danger{background:rgba(232,64,64,.13);border-color:var(--red);}
+    .alert-icon{font-size:1.3rem;flex-shrink:0;}
+    .alert-main{flex:1;min-width:0;}
+    .alert-name{font-weight:600;font-size:.82rem;}
+    .alert-sub{color:var(--muted);font-size:.68rem;margin-top:2px;}
+    .pill{padding:3px 9px;border-radius:12px;font-size:.62rem;font-weight:700;flex-shrink:0;}
+    .pill.ok{color:var(--green);background:rgba(34,212,114,.15);}
+    .pill.danger{color:var(--red);background:rgba(232,64,64,.22);}
+
+    /* REFEREE */
+    .referee-msg{
+      font-size:.95rem;color:var(--yellow);
+      line-height:1.6;min-height:38px;word-break:break-word;
+    }
+
+    /* CLIPS */
+    .tabs{display:flex;gap:5px;}
+    .tab{
+      padding:4px 12px;border-radius:12px;font-size:.65rem;font-weight:700;
+      cursor:pointer;background:var(--card2);color:var(--muted);
+      border:1px solid var(--border);transition:background .15s;
+    }
+    .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+    .clips-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+      gap:10px;
+      margin-top:8px;
+      max-height:320px;
+      overflow-y:auto;
+    }
+    .clips-grid::-webkit-scrollbar{width:4px;}
+    .clips-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+    .clip-card{
+      border:1px solid var(--border);background:var(--card2);
+      border-radius:9px;overflow:hidden;
+      transition:border-color .2s,transform .15s;
+    }
+    .clip-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+
+    .clip-video-wrap{
+      position:relative;width:100%;
+      padding-top:56.25%;/* 16:9 */
+      background:#000;overflow:hidden;
+    }
+    .clip-video-wrap video{
+      position:absolute;top:0;left:0;
+      width:100%;height:100%;object-fit:cover;
+    }
+    .clip-type-badge{
+      position:absolute;top:6px;left:6px;
+      background:rgba(0,0,0,.7);color:var(--accent);
+      font-size:.58rem;font-weight:700;padding:2px 7px;
+      border-radius:10px;text-transform:uppercase;
+    }
+
+    .clip-meta{padding:8px 10px;}
+    .clip-title{
+      display:block;color:var(--text);font-weight:700;
+      font-size:.72rem;margin-bottom:3px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .clip-detail{font-size:.6rem;color:var(--muted);}
+    .clip-actions{
+      display:flex;gap:6px;margin-top:6px;
+    }
+    .clip-btn{
+      flex:1;padding:4px 0;border-radius:6px;border:none;
+      font-size:.6rem;font-weight:700;cursor:pointer;
+      background:var(--card);color:var(--muted);
+      transition:background .15s;
+    }
+    .clip-btn:hover{background:var(--accent);color:#fff;}
+
+    .none{color:var(--muted);font-size:.75rem;padding:20px 0;text-align:center;}
+
+    /* ESP32 */
+    .esp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+    .esp-item{background:var(--card2);border-radius:7px;padding:9px 10px;}
+    .esp-label{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+    .esp-value{font-size:.88rem;font-weight:700;color:var(--accent);margin-top:3px;}
+
+    /* SPORT SWITCH PROGRESS */
+    .switch-wrap{display:none;margin-top:4px;}
+    .switch-wrap.show{display:block;}
+    .switch-lbl{font-size:.63rem;color:var(--yellow);margin-bottom:3px;}
+    .switch-bg{height:4px;background:var(--card2);border-radius:3px;overflow:hidden;}
+    .switch-fill{height:100%;background:var(--yellow);width:0%;transition:width .3s;}
+
+    #stream-status-lbl{font-size:.67rem;}
+
+    @media(max-width:1280px){
+      .layout{flex-direction:column;}
+      .col-l{width:100%;}
+      .stream-wrapper{width:100%;height:auto;aspect-ratio:4/3;}
+      .stats{grid-template-columns:repeat(3,1fr);}
+      .esp-grid{grid-template-columns:repeat(2,1fr);}
+    }
+    @media(max-width:600px){
+      .stats{grid-template-columns:repeat(2,1fr);}
+      .esp-grid{grid-template-columns:1fr 1fr;}
+      .clips-grid{grid-template-columns:1fr 1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="h-left">
+    <span class="logo">🏆</span>
+    <div>
+      <h1>Smart Playground Monitor</h1>
+      <div class="h-sub">Safety Monitoring · Sports Analytics · Event Clips</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <button class="stream-btn running" id="stream-btn" onclick="toggleStream()">
+      <span id="btn-icon">⏹</span>
+      <span id="btn-label">Stop</span>
+    </button>
+    <div class="badge"><span class="dot pulse" id="dot-esp"></span>ESP32</div>
+    <div class="badge"><span class="dot" id="dot-server"></span>Server</div>
+    <div class="badge"><span class="dot" id="dot-cloud"></span>Cloud</div>
+  </div>
+</header>
+
+<!-- ALERT BAR -->
+<div class="alert-bar" id="alert-bar">
+  <span id="alert-text">⚠️ Alert</span>
+</div>
+
+<div class="layout">
+
+  <!-- ═══ LEFT COLUMN ═══ -->
+  <div class="col-l">
+
+    <div class="sec-lbl">
+      <span>📹 Live Stream</span>
+      <span id="stream-status-lbl" style="color:var(--green);">● Active</span>
+    </div>
+
+    <!-- Stream box -->
+    <div class="stream-wrapper">
+      <img id="stream-img" src="/stream" alt="Live Stream"/>
+
+      <!-- REC overlay on top of stream -->
+      <div class="rec-overlay" id="rec-overlay">
+        ● REC
+      </div>
+
+      <!-- Paused overlay -->
+      <div class="paused-overlay" id="paused-overlay">
+        <div class="paused-icon">⏸️</div>
+        <div class="paused-text">Detection Paused</div>
+        <div class="paused-sub">ESP32-CAM is still on — AI stopped</div>
+        <button class="resume-btn" onclick="toggleStream()">
+          ▶ Resume Detection
+        </button>
+      </div>
+    </div>
+
+    <!-- Sport switch progress -->
+    <div class="switch-wrap" id="switch-wrap">
+      <div class="switch-lbl" id="switch-lbl">Switching sport...</div>
+      <div class="switch-bg">
+        <div class="switch-fill" id="switch-fill"></div>
+      </div>
+    </div>
+
+    <!-- ── RECORDING PROGRESS CARD ── -->
+    <div class="card rec-card" id="rec-card">
+      <div class="rec-header">
+        <div class="rec-dot-big"></div>
+        <span class="rec-title">Recording Event Clip</span>
+        <span class="rec-pct" id="rec-pct">0%</span>
+      </div>
+      <div class="rec-bar-bg">
+        <div class="rec-bar-fill" id="rec-bar-fill"></div>
+      </div>
+      <div class="rec-info">
+        <span id="rec-type">—</span>
+        <span id="rec-time">—</span>
+      </div>
+    </div>
+
+    <!-- ── EVENT CLIPS ── -->
+    <div class="card">
+      <div class="sec-lbl" style="margin-bottom:0;">
+        <span style="font-size:.75rem;font-weight:700;color:var(--muted);
+                     text-transform:uppercase;letter-spacing:.06em;">
+          📂 Event Clips
+        </span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="clips-count" style="font-size:.65rem;color:var(--muted);"></span>
+          <div class="tabs">
+            <div class="tab active" id="tab-local"
+                 onclick="switchTab('local')">💾 Local</div>
+            <div class="tab" id="tab-cloud"
+                 onclick="switchTab('cloud')">☁️ Cloud</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="clips-grid" id="local-clips">
+        <div class="none">No local events recorded yet</div>
+      </div>
+      <div class="clips-grid" id="cloud-clips" style="display:none;">
+        <div class="none">No cloud events yet</div>
+      </div>
+    </div>
+
+    <!-- ── ESP32 INFO ── -->
+    <div class="card">
+      <div class="card-title">📡 ESP32-CAM Hardware</div>
+      <div class="esp-grid">
+        <div class="esp-item">
+          <div class="esp-label">IP Address</div>
+          <div class="esp-value" id="esp-ip">—</div>
+        </div>
+        <div class="esp-item">
+          <div class="esp-label">WiFi Signal</div>
+          <div class="esp-value" id="esp-rssi">—</div>
+        </div>
+        <div class="esp-item">
+          <div class="esp-label">Stream FPS</div>
+          <div class="esp-value" id="esp-fps-val">—</div>
+        </div>
+        <div class="esp-item">
+          <div class="esp-label">Uptime</div>
+          <div class="esp-value" id="esp-uptime">—</div>
+        </div>
+        <div class="esp-item">
+          <div class="esp-label">Free Memory</div>
+          <div class="esp-value" id="esp-heap">—</div>
+        </div>
+        <div class="esp-item">
+          <div class="esp-label">Total Frames</div>
+          <div class="esp-value" id="esp-frames">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end col-l -->
+
+  <!-- ═══ RIGHT COLUMN ═══ -->
+  <div class="col-r">
+
+    <!-- Mode card -->
+    <div class="card mode-card">
+      <div class="mode-icon" id="mode-icon">🛡️</div>
+      <div style="flex:1;min-width:0;">
+        <div class="mode-label">Current Mode</div>
+        <div class="mode-value" id="mode-value">—</div>
+        <div class="mode-sport" id="mode-sport"></div>
+      </div>
+      <div class="mode-pill" id="mode-pill">—</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-icon">📡</div>
+        <div class="stat-value" id="s-motion">—</div>
+        <div class="stat-label">Motion</div>
+      </div>
+      <div class="stat">
+        <div class="stat-icon">🎥</div>
+        <div class="stat-value" id="s-fps">—</div>
+        <div class="stat-label">FPS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" id="s-players">—</div>
+        <div class="stat-label">Players</div>
+      </div>
+      <div class="stat">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-value" id="s-avg-spd">—</div>
+        <div class="stat-label">Avg km/h</div>
+      </div>
+      <div class="stat">
+        <div class="stat-icon">🏃</div>
+        <div class="stat-value" id="s-fastest">—</div>
+        <div class="stat-label">Fastest</div>
+      </div>
+      <div class="stat">
+        <div class="stat-icon">📼</div>
+        <div class="stat-value" id="s-clips">—</div>
+        <div class="stat-label">Clips</div>
+      </div>
+    </div>
+
+    <!-- Safety Alerts -->
+    <div class="card">
+      <div class="card-title">🚨 Safety Alerts</div>
+
+      <div class="alert-row" id="fall-row">
+        <div class="alert-icon">🤸</div>
+        <div class="alert-main">
+          <div class="alert-name">Fall Detection</div>
+          <div class="alert-sub" id="fall-sub">Monitoring...</div>
+        </div>
+        <span class="pill ok" id="fall-pill">OK</span>
+      </div>
+
+      <div class="alert-row" id="unauth-row">
+        <div class="alert-icon">🚫</div>
+        <div class="alert-main">
+          <div class="alert-name">Unauthorized Entry</div>
+          <div class="alert-sub" id="unauth-sub">Monitoring...</div>
+        </div>
+        <span class="pill ok" id="unauth-pill">OK</span>
+      </div>
+
+      <div class="alert-row" id="uniform-row">
+        <div class="alert-icon">👕</div>
+        <div class="alert-main">
+          <div class="alert-name">Uniform Status</div>
+          <div class="alert-sub" id="uniform-sub">Monitoring...</div>
+        </div>
+        <span class="pill ok" id="uniform-pill">OK</span>
+      </div>
+    </div>
+
+    <!-- Referee -->
+    <div class="card">
+      <div class="card-title">🏅 AI Referee / Sports Analytics</div>
+      <div class="referee-msg" id="referee-msg">
+        Monitoring playground...
+      </div>
+    </div>
+
+  </div><!-- end col-r -->
+</div><!-- end layout -->
+
+<script>
+"use strict";
+
+// ── Helpers ──────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const txt = (id,v) => { const e=$(id); if(e) e.textContent=(v??"")===""?"—":v; };
+const dot = (id,c) => { const e=$(id); if(e) e.className="dot "+c; };
+const cap = s => s?s[0].toUpperCase()+s.slice(1):"";
+
+const SPORT_ICONS = {
+  football:"⚽", basketball:"🏀", cricket:"🏏", badminton:"🏸"
+};
+
+function formatUptime(sec){
+  sec=Number(sec||0);
+  if(sec<60)   return sec+"s";
+  if(sec<3600) return Math.floor(sec/60)+"m "+(sec%60)+"s";
+  return Math.floor(sec/3600)+"h "+Math.floor((sec%3600)/60)+"m";
+}
+
+function setAlert(rowId,subId,pillId,active,text){
+  $(rowId).className="alert-row"+(active?" danger":"");
+  txt(subId,text);
+  $(pillId).textContent=active?"ALERT":"OK";
+  $(pillId).className="pill "+(active?"danger":"ok");
+}
+
+// ── Stream toggle ────────────────────────────────────────
+let streamRunning=true;
+
+function toggleStream(){
+  streamRunning?doStop():doStart();
+}
+
+function doStart(){
+  streamRunning=true;
+  fetch("/api/stream/start",{method:"POST"}).catch(()=>{});
+  $("stream-img").src="/stream?t="+Date.now();
+  $("paused-overlay").classList.remove("show");
+  $("stream-btn").className="stream-btn running";
+  $("btn-icon").textContent="⏹";
+  $("btn-label").textContent="Stop";
+  $("stream-status-lbl").textContent="● Active";
+  $("stream-status-lbl").style.color="var(--green)";
+}
+
+function doStop(){
+  streamRunning=false;
+  fetch("/api/stream/stop",{method:"POST"}).catch(()=>{});
+  $("stream-img").src="";
+  $("paused-overlay").classList.add("show");
+  $("stream-btn").className="stream-btn stopped";
+  $("btn-icon").textContent="▶";
+  $("btn-label").textContent="Start";
+  $("stream-status-lbl").textContent="⏸ Paused";
+  $("stream-status-lbl").style.color="var(--muted)";
+  // Clear live values
+  ["s-motion","s-fps","s-players","s-avg-spd","s-fastest"].forEach(
+    id=>txt(id,"—"));
+  txt("mode-value","PAUSED");
+  txt("mode-sport","AI detection stopped");
+  $("mode-pill").textContent="STOPPED";
+  $("mode-pill").className="mode-pill stopped";
+  $("mode-icon").textContent="⏸️";
+  $("alert-bar").className="alert-bar";
+  txt("referee-msg","Detection paused — press Start to resume.");
+  $("rec-card").classList.remove("show");
+  $("rec-overlay").classList.remove("show");
+}
+
+// ── WebSocket ────────────────────────────────────────────
+let ws, reconnDelay=1000;
+let activeTab="local";
+let cloudEvents=[];
+let lastLocalSig="", lastCloudSig="";
+let recStartTime=null;
+let recTimer=null;
+
+function connectWS(){
+  const proto=location.protocol==="https:"?"wss":"ws";
+  ws=new WebSocket(proto+"://"+location.host+"/ws");
+  ws.onopen=()=>{
+    reconnDelay=1000;
+    dot("dot-server","green");
+  };
+  ws.onmessage=ev=>{
+    if(!streamRunning)return;
+    try{ updateDash(JSON.parse(ev.data)); }
+    catch(e){ console.error("WS:",e); }
+  };
+  ws.onclose=()=>{
+    dot("dot-server","red");
+    setTimeout(connectWS,reconnDelay);
+    reconnDelay=Math.min(reconnDelay*1.8,15000);
+  };
+  ws.onerror=()=>{ try{ws.close();}catch(e){} };
+}
+
+// ── Main update ──────────────────────────────────────────
+function updateDash(d){
+
+  // Mode
+  const mode  =(d.mode||"SAFETY").toUpperCase();
+  const sport =d.sport||null;
+  const sc    =d.sport_candidate||null;
+  const scf   =d.sport_candidate_conf||0;
+
+  txt("mode-value",mode);
+  $("mode-icon").textContent=
+    (mode==="SPORT"&&sport)?(SPORT_ICONS[sport]||"🏅"):"🛡️";
+
+  if(sport){
+    txt("mode-sport","▸ "+cap(sport)+" — "+
+        Math.round((d.sport_confidence||0)*100)+"%");
+  }else if(sc){
+    txt("mode-sport","Detecting: "+cap(sc)+" ("+
+        (scf*100).toFixed(0)+"%)");
+  }else{
+    txt("mode-sport","");
+  }
+
+  const pill=$("mode-pill");
+  pill.textContent=sport?sport.toUpperCase():mode;
+  pill.className="mode-pill "+(sport?"sport":mode.toLowerCase());
+
+  // Sport switch progress bar
+  const swc=d.sport_switch_candidate;
+  const swp=d.sport_switch_progress||0;
+  if(swc&&swp>0){
+    $("switch-wrap").classList.add("show");
+    txt("switch-lbl",
+      "Switching to "+cap(swc)+"… "+Math.round(swp*100)+"%");
+    $("switch-fill").style.width=Math.round(swp*100)+"%";
+  }else{
+    $("switch-wrap").classList.remove("show");
+  }
+
+  // Stats
+  txt("s-motion",  d.motion_score!=null?Number(d.motion_score).toFixed(1):"—");
+  txt("s-fps",     d.esp32_fps!=null?Number(d.esp32_fps).toFixed(0):"—");
+  txt("s-players", d.player_count||"—");
+  txt("s-avg-spd", d.avg_speed_kmh!=null?Number(d.avg_speed_kmh).toFixed(0):"—");
+  txt("s-fastest",
+    (d.fastest_player&&d.fastest_speed)
+      ?"P"+d.fastest_player+":"+Number(d.fastest_speed).toFixed(0)
+      :"—");
+  const tot=(d.local_clips||[]).length+(d.cloud_events||[]).length;
+  txt("s-clips",tot||"—");
+
+  // Dots
+  dot("dot-esp",  d.esp32_connected?"pulse":"red");
+  dot("dot-cloud",d.cloud_connected?"green":"red");
+
+  // Alerts
+  const fall  =!!d.fall_detected;
+  const unauth=!!d.unauthorized;
+  const unifSt=d.uniform_status||"";
+
+  setAlert("fall-row","fall-sub","fall-pill",fall,
+    fall?"Detected! "+Math.round((d.fall_conf||0)*100)+"%":"No incidents");
+
+  setAlert("unauth-row","unauth-sub","unauth-pill",unauth,
+    unauth?"Unauthorized person detected!":"No incidents");
+
+  const unifAlert=unifSt==="UNAUTHORIZED";
+  setAlert("uniform-row","uniform-sub","uniform-pill",unifAlert,
+    unifSt==="AUTHORIZED"?"Authorized ✓":
+    unifSt==="UNAUTHORIZED"?"Unauthorized uniform!":
+    unifSt==="FALL_OVERRIDE"?"Fall override":
+    unifSt==="MOTION_TOO_HIGH"?"High motion (skipped)":
+    "Monitoring...");
+
+  // Alert bar
+  const ab=$("alert-bar");
+  if(fall){
+    ab.className="alert-bar fall";
+    txt("alert-text","🤸 FALL DETECTED — Check immediately!");
+  }else if(unauth){
+    ab.className="alert-bar unauth";
+    txt("alert-text","🚫 UNAUTHORIZED PERSON DETECTED!");
+  }else{
+    ab.className="alert-bar";
+  }
+
+  txt("referee-msg",d.referee_msg||"Monitoring playground...");
+
+  // ── Recording indicator ───────────────────────────────
+  const recCard   =$("rec-card");
+  const recOverlay=$("rec-overlay");
+
+  if(d.recording){
+    recCard.classList.add("show");
+    recOverlay.classList.add("show");
+
+    if(!recStartTime) recStartTime=Date.now();
+
+    const pct=Math.round((d.rec_progress||0)*100);
+    txt("rec-pct",pct+"%");
+    $("rec-bar-fill").style.width=pct+"%";
+
+    // Show event type
+    const lastClip=(d.local_clips||[])[0];
+    txt("rec-type",lastClip?cap(lastClip.event_type||"event"):"Recording...");
+
+    // Elapsed time
+    const elapsed=Math.round((Date.now()-recStartTime)/1000);
+    txt("rec-time",elapsed+"s elapsed");
+
+  }else{
+    recCard.classList.remove("show");
+    recOverlay.classList.remove("show");
+    $("rec-bar-fill").style.width="0%";
+    recStartTime=null;
+  }
+
+  // ESP32 info
+  txt("esp-ip",     d.esp32_ip||"—");
+  txt("esp-rssi",   d.esp32_rssi!=null?d.esp32_rssi+" dBm":"—");
+  txt("esp-fps-val",d.esp32_fps!=null?Number(d.esp32_fps).toFixed(1)+" fps":"—");
+  txt("esp-uptime", d.esp32_uptime_sec!=null?formatUptime(d.esp32_uptime_sec):"—");
+  txt("esp-heap",   d.esp32_heap_free!=null?Math.round(d.esp32_heap_free/1024)+" KB":"—");
+  txt("esp-frames", d.frame_count!=null?Number(d.frame_count).toLocaleString():"—");
+
+  // Clips
+  renderLocalClips(d.local_clips||[]);
+  if(d.cloud_events){
+    cloudEvents=d.cloud_events;
+    if(activeTab==="cloud") renderCloudClips(cloudEvents);
+  }
+
+  // Clips count label
+  const lc=(d.local_clips||[]).length;
+  const cc=(d.cloud_events||[]).length;
+  txt("clips-count",
+    lc||cc?(lc+" local"+(cc?" · "+cc+" cloud":"")):"");
+}
+
+// ── Clip renderers ────────────────────────────────────────
+function makeClipCard(title, url, timeStr, detail, badge) {
+  const card = document.createElement("div");
+  card.className = "clip-card";
+  const safeUrl = url || "";
+
+  card.innerHTML = `
+    <div class="clip-video-wrap">
+      <video
+        preload="auto"
+        muted
+        playsinline
+        controls
+        style="width:100%;height:118px;object-fit:cover;background:#111;"
+        onerror="this.style.opacity='.2';">
+        <source src="${safeUrl}" type="video/mp4">
+      </video>
+      <span class="clip-type-badge">${badge || "🎬"}</span>
+    </div>
+    <div class="clip-meta">
+      <span class="clip-title">${title}</span>
+      <span class="clip-detail">${timeStr}${detail ? " · " + detail : ""}</span>
+      <div class="clip-actions">
+        <button class="clip-btn"
+          onclick="togglePlay(this)">▶ Play</button>
+        <button class="clip-btn"
+          onclick="window.open('${safeUrl}','_blank')">↗ Open</button>
+      </div>
+    </div>`;
+  return card;
+}
+
+function togglePlay(btn) {
+  const video = btn.closest(".clip-card").querySelector("video");
+  if (video.paused) {
+    // Pause all other videos first
+    document.querySelectorAll(".clip-card video").forEach(v => {
+      if (v !== video) { v.pause(); }
+    });
+    video.play();
+    btn.textContent = "⏸ Pause";
+  } else {
+    video.pause();
+    btn.textContent = "▶ Play";
+  }
+}
+
+
+function renderLocalClips(clips){
+  const sig=clips.length+"_"+(clips[0]?.timestamp||"");
+  if(sig===lastLocalSig) return;
+  lastLocalSig=sig;
+
+  const grid=$("local-clips");
+  if(!clips.length){
+    grid.innerHTML='<div class="none">No local events recorded yet</div>';
+    return;
+  }
+  grid.innerHTML="";
+
+  // Newest first
+  [...clips].reverse().forEach(c=>{
+    const title=cap((c.event_type||"event").replaceAll("_"," "));
+    const url  =c.local_url||"";
+    let   ts   ="—";
+    try{ ts=new Date(c.timestamp).toLocaleTimeString(); }catch(e){}
+    const detail=c.size_kb?c.size_kb+" KB":"";
+    const badge =c.sport?SPORT_ICONS[c.sport]||"🎮":"🎬";
+    grid.appendChild(makeClipCard(title,url,ts,detail,badge));
+  });
+}
+
+function renderCloudClips(events){
+  const sig=events.length+"_"+(events[0]?.id||"");
+  if(sig===lastCloudSig) return;
+  lastCloudSig=sig;
+
+  const grid=$("cloud-clips");
+  if(!events.length){
+    grid.innerHTML='<div class="none">No cloud events yet</div>';
+    return;
+  }
+  grid.innerHTML="";
+
+  [...events].reverse().forEach(e=>{
+    const title=cap((e.event_type||"event").replaceAll("_"," "));
+    const url  =e.video_url||"";
+    let   ts   ="—";
+    try{ ts=new Date(e.created_at).toLocaleTimeString(); }catch(ex){}
+    const badge=(e.sport?SPORT_ICONS[e.sport]:"☁️")||"☁️";
+    grid.appendChild(makeClipCard(title+" ☁️",url,ts,"",badge));
+  });
+}
+
+function switchTab(tab){
+  activeTab=tab;
+  $("tab-local").className="tab"+(tab==="local"?" active":"");
+  $("tab-cloud").className="tab"+(tab==="cloud"?" active":"");
+  $("local-clips").style.display=tab==="local"?"grid":"none";
+  $("cloud-clips").style.display=tab==="cloud"?"grid":"none";
+  if(tab==="cloud") renderCloudClips(cloudEvents);
+}
+
+connectWS();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# requirements.txt
+# Python 3.11 compatible versions
+
+# Backend / API
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+aiofiles==23.2.1
+python-multipart==0.0.6
+
+# Computer Vision
+opencv-python==4.8.1.78
+numpy==1.24.3
+Pillow==10.1.0
+mediapipe==0.10.9
+
+# AI / ML
+tensorflow==2.15.0
+
+# Cloud / Database
+supabase==2.3.4
+python-dotenv==1.0.0
+
+# Utilities
+requests==2.31.0
